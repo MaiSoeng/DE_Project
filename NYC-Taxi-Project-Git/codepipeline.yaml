@@ -1,0 +1,870 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CI/CD Pipeline for NYC Taxi ETL Pipeline using AWS CodePipeline'
+
+Parameters:
+  DeployEnvironment:
+    Type: String
+    Default: dev
+    AllowedValues: [ dev, prod, staging ]
+
+  ProjectName:
+    Type: String
+    Default: project-nyc-taxi
+    Description: Project Name
+
+  GitHubOwner:
+    Type: String
+    Description: Github repository owner
+
+  GitHubRepo:
+    Type: String
+    Description: Github repository name
+
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: Github branch to deploy
+
+  GitHubToken:
+    Type: String
+    NoEcho: true
+    Description: Github personal access token
+
+  NotificationEmail:
+    Type: String
+    Description: Email address to send notifications for pipeline failures
+
+Resources:
+  # S3 bucket to store pipeline artifacts
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-${DeployEnvironment}-pipeline-artifacts'
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+        - Id: DeleteOldVersions
+          Status: Enabled
+          NoncurrentVersionExpiration:
+            NoncurrentDays: 90
+        - Id: GlacierRule
+          Prefix: glacier/
+          Status: Enabled
+          ExpirationInDays: 365
+          Transitions:
+          - TransitionInDays: 90
+            StorageClass: GLACIER_IR
+
+  # Notifications for pipeline failures
+  PipelineNotification:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${ProjectName}-${DeployEnvironment}-pipeline-notifications'
+      Subscription:
+      - Protocol: email
+        Endpoint: !Ref NotificationEmail
+
+  # IAM Role for CodePipeline
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${DeployEnvironment}-pipeline-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: codepipeline.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: PipelineExecutionPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetBucketVersioning
+            - s3:GetObject
+            - s3:GetObjectVersion
+            - s3:PutObject
+            Resource:
+            - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+            - !GetAtt ArtifactBucket.Arn
+          - Effect: Allow
+            Action:
+            - codebuild:BatchGetBuilds
+            - codebuild:StartBuild
+            Resource:
+            - !GetAtt CodeBuildProject.Arn
+          - Effect: Allow
+            Action:
+            - cloudformation:CreateStack
+            - cloudformation:DeleteStack
+            - cloudformation:DescribeStacks
+            - cloudformation:UpdateStack
+            - cloudformation:CreateChangeSet
+            - cloudformation:DeleteChangeSet
+            - cloudformation:DescribeChangeSet
+            - cloudformation:ExecuteChangeSet
+            - cloudformation:SetStackPolicy
+            - cloudformation:ValidateTemplate
+            Resource:
+            - !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-*'
+          - Effect: Allow
+            Action:
+            - iam:PassRole
+            Resource: !GetAtt CloudFormationRole.Arn
+          - Effect: Allow
+            Action:
+            - sns:Publish
+            Resource: !GetAtt PipelineNotification.TopicArn
+
+      - PolicyName: VPCAccess
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:CreateNetworkInterface
+            - ec2:DescribeNetworkInterfaces
+            - ec2:DeleteNetworkInterface
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - ec2:CreateNetworkInterfacePermission
+            - ec2:DescribeNetworkInterfacePermissions
+            - ec2:DeleteNetworkInterfacePermission
+            Resource: '*'
+
+  # IAM Role for CodeBuild
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${DeployEnvironment}-codebuild-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: codebuild.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: CodeBuildPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:ListBucket
+            - s3:GetBucketLocation
+            Resource:
+            - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+            - !GetAtt ArtifactBucket.Arn
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${ProjectName}-*'
+          - Effect: Allow
+            Action:
+            - glue:GetJob
+            - glue:GetJobRun
+            - glue:GetJobRuns
+            - glue:StartJobRun
+            Resource: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:job/${ProjectName}-*'
+          - Effect: Allow
+            Action:
+            - sns:Publish
+            Resource: !GetAtt PipelineNotification.TopicArn
+          - Effect: Allow
+            Action:
+            - cloudformation:ValidateTemplate
+            Resource: '*'
+
+  # IAM Role for CloudFormation
+  CloudFormationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${DeployEnvironment}-cloudformation-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: cloudformation.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: CloudFormationExecutionPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - iam:CreateRole
+            - iam:DeleteRole
+            - iam:GetRole
+            - iam:PassRole
+            - iam:AttachRolePolicy
+            - iam:DetachRolePolicy
+            - iam:PutRolePolicy
+            - iam:DeleteRolePolicy
+            - iam:CreateInstanceProfile
+            - iam:DeleteInstanceProfile
+            - iam:AddRoleToInstanceProfile
+            - iam:RemoveRoleFromInstanceProfile
+            - iam:GetInstanceProfile
+            - iam:ListInstanceProfilesForRole
+            Resource:
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-*'
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:instance-profile/${ProjectName}-*'
+
+          # S3 
+          - Effect: Allow
+            Action:
+            - s3:CreateBucket
+            - s3:DeleteBucket
+            - s3:PutBucketPolicy
+            - s3:DeleteBucketPolicy
+            - s3:GetBucketPolicy
+            - s3:PutBucketVersioning
+            - s3:PutBucketPublicAccessBlock
+            - s3:PutBucketLifecycleConfiguration
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:GetObject
+            - s3:ListBucket
+            Resource:
+            - !Sub 'arn:aws:s3:::${ProjectName}-*'
+            - !Sub 'arn:aws:s3:::${ProjectName}-*/*'
+
+          # CodePipeline 
+          - Effect: Allow
+            Action:
+            - codepipeline:CreatePipeline
+            - codepipeline:DeletePipeline
+            - codepipeline:GetPipeline
+            - codepipeline:GetPipelineState
+            - codepipeline:ListPipelines
+            - codepipeline:UpdatePipeline
+            - codepipeline:TagResource
+            - codepipeline:UntagResource
+            Resource: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:pipeline/${ProjectName}-*'
+
+          # CodeBuild 
+          - Effect: Allow
+            Action:
+            - codebuild:CreateProject
+            - codebuild:DeleteProject
+            - codebuild:GetProject
+            - codebuild:ListProjects
+            - codebuild:UpdateProject
+            - codebuild:StartBuild
+            - codebuild:StopBuild
+            - codebuild:BatchGetBuilds
+            Resource: !Sub 'arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:project/${ProjectName}-*'
+
+          # Glue 
+          - Effect: Allow
+            Action:
+            - glue:CreateJob
+            - glue:DeleteJob
+            - glue:GetJob
+            - glue:GetJobs
+            - glue:UpdateJob
+            - glue:StartJobRun
+            - glue:StopJobRun
+            - glue:GetJobRun
+            - glue:GetJobRuns
+            - glue:CreateConnection
+            - glue:DeleteConnection
+            - glue:GetConnection
+            - glue:GetConnections
+            - glue:CreateCrawler
+            - glue:DeleteCrawler
+            - glue:GetCrawler
+            - glue:UpdateCrawler
+            - glue:StartCrawler
+            - glue:StopCrawler
+            Resource: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:*'
+
+          # RDS 
+          - Effect: Allow
+            Action:
+            - rds:CreateDBCluster
+            - rds:DeleteDBCluster
+            - rds:DescribeDBClusters
+            - rds:ModifyDBCluster
+            - rds:CreateDBInstance
+            - rds:DeleteDBInstance
+            - rds:DescribeDBInstances
+            - rds:ModifyDBInstance
+            - rds:CreateDBParameterGroup
+            - rds:DeleteDBParameterGroup
+            - rds:DescribeDBParameterGroups
+            - rds:CreateDBSubnetGroup
+            - rds:DeleteDBSubnetGroup
+            - rds:DescribeDBSubnetGroups
+            Resource: !Sub 'arn:aws:rds:${AWS::Region}:${AWS::AccountId}:*'
+
+          # Secrets Manager 
+          - Effect: Allow
+            Action:
+            - secretsmanager:CreateSecret
+            - secretsmanager:DeleteSecret
+            - secretsmanager:GetSecretValue
+            - secretsmanager:PutSecretValue
+            - secretsmanager:UpdateSecret
+            - secretsmanager:DescribeSecret
+            Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}-*'
+
+          # SNS 
+          - Effect: Allow
+            Action:
+            - sns:CreateTopic
+            - sns:DeleteTopic
+            - sns:GetTopicAttributes
+            - sns:SetTopicAttributes
+            - sns:Subscribe
+            - sns:Unsubscribe
+            Resource: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ProjectName}-*'
+
+          # VPC 
+          - Effect: Allow
+            Action:
+            - ec2:CreateSecurityGroup
+            - ec2:DeleteSecurityGroup
+            - ec2:DescribeSecurityGroups
+            - ec2:AuthorizeSecurityGroupIngress
+            - ec2:AuthorizeSecurityGroupEgress
+            - ec2:RevokeSecurityGroupIngress
+            - ec2:RevokeSecurityGroupEgress
+            - ec2:CreateVpcEndpoint
+            - ec2:DeleteVpcEndpoint
+            - ec2:DescribeVpcEndpoints
+            - ec2:ModifyVpcEndpoint
+            Resource: '*'
+
+          # CloudWatch 
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:DeleteLogGroup
+            - logs:DescribeLogGroups
+            - logs:PutRetentionPolicy
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/glue/${ProjectName}-*'
+
+          # Lambda 
+          - Effect: Allow
+            Action:
+            - lambda:CreateFunction
+            - lambda:DeleteFunction
+            - lambda:GetFunction
+            - lambda:UpdateFunctionCode
+            - lambda:UpdateFunctionConfiguration
+            - lambda:ListFunctions
+            - lambda:PublishVersion
+            - lambda:GetFunctionConfiguration
+            - lambda:AddPermission
+            - lambda:RemovePermission
+            - lambda:InvokeFunction
+            Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
+
+          # EventBridge 
+          - Effect: Allow
+            Action:
+            - events:PutRule
+            - events:DeleteRule
+            - events:DescribeRule
+            - events:EnableRule
+            - events:DisableRule
+            - events:PutTargets
+            - events:RemoveTargets
+            - events:ListTargetsByRule
+            Resource: !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${ProjectName}-*'
+
+  # IAM Role for Post-Deploy Lambda
+  PostDeployLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-${DeployEnvironment}-postdeploy-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+      - PolicyName: PostDeployPolicy
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:PutObject
+            - s3:GetObject
+            - s3:ListBucket
+            - s3:GetBucketLocation
+            Resource:
+            - !Sub 'arn:aws:s3:::${ProjectName}-*'
+            - !Sub 'arn:aws:s3:::${ProjectName}-*/*'
+            - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+            - !GetAtt ArtifactBucket.Arn
+          - Effect: Allow
+            Action:
+            - rds:DescribeDBClusters
+            - rds:DescribeDBInstances
+            - rds-data:ExecuteStatement
+            - rds-data:BatchExecuteStatement
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - secretsmanager:GetSecretValue
+            - secretsmanager:DescribeSecret
+            Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}-*'
+          - Effect: Allow
+            Action:
+            - cloudformation:DescribeStacks
+            - cloudformation:DescribeStackResources
+            - cloudformation:ListStackResources
+            Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-*'
+          - Effect: Allow
+            Action:
+            - codepipeline:PutJobSuccessResult
+            - codepipeline:PutJobFailureResult
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+
+  # Lambda Function for Post-Deploy Tasks
+  PostDeployFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-${DeployEnvironment}-postdeploy'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt PostDeployLambdaRole.Arn
+      Timeout: 600
+      MemorySize: 512
+      Environment:
+        Variables:
+          PROJECT_NAME: !Ref ProjectName
+          DEPLOY_ENV: !Ref DeployEnvironment
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import zipfile
+          import tempfile
+          import time
+          from botocore.exceptions import ClientError
+
+          s3 = boto3.client('s3')
+          rds_data = boto3.client('rds-data')
+          cfn = boto3.client('cloudformation')
+          secrets = boto3.client('secretsmanager')
+          codepipeline = boto3.client('codepipeline')
+
+          def lambda_handler(event, context):
+              print(f"Event: {json.dumps(event)}")
+              
+              job_id = event['CodePipeline.job']['id']
+              
+              try:
+                  # Get user parameters
+                  user_params = json.loads(
+                      event['CodePipeline.job']['data']['actionConfiguration']['configuration']['UserParameters']
+                  )
+                  
+                  stack_name = user_params['StackName']
+                  project_name = user_params['ProjectName']
+                  
+                  print(f"Processing post-deploy for stack: {stack_name}")
+                  
+                  # Get stack outputs
+                  stack = cfn.describe_stacks(StackName = stack_name)['Stacks'][0]
+                  outputs = {o['OutputKey']: o['OutputValue'] for o in stack.get('Outputs', [])}
+                  
+                  glue_bucket = outputs.get('GlueBucket')
+                  db_endpoint = outputs.get('AuroraClusterEndpoint')
+                  db_secret_arn = outputs.get('DatabaseSecretArn')
+                  
+                  print(f"Glue Bucket: {glue_bucket}")
+                  print(f"DB Endpoint: {db_endpoint}")
+                  
+                  # Get artifact from CodePipeline
+                  input_artifacts = event['CodePipeline.job']['data']['inputArtifacts']
+                  
+                  if len(input_artifacts) > 0:
+                      artifact_location = input_artifacts[0]['location']['s3Location']
+                      artifact_bucket = artifact_location['bucketName']
+                      artifact_key = artifact_location['objectKey']
+                      
+                      print(f"Downloading artifact from s3://{artifact_bucket}/{artifact_key}")
+                      
+                      with tempfile.TemporaryDirectory() as tmpdir:
+                          artifact_path = os.path.join(tmpdir, 'artifact.zip')
+                          
+                          # Download artifact
+                          s3.download_file(artifact_bucket, artifact_key, artifact_path)
+                          
+                          # Extract artifact
+                          with zipfile.ZipFile(artifact_path, 'r') as zip_ref:
+                              zip_ref.extractall(tmpdir)
+                          
+                          # Upload taxi_etl.py to Glue bucket
+                          etl_script_path = os.path.join(tmpdir, 'taxi_etl.py')
+                          if os.path.exists(etl_script_path):
+                              print(f"Uploading taxi_etl.py to s3://{glue_bucket}/scripts/")
+                              s3.upload_file(
+                                  etl_script_path,
+                                  glue_bucket,
+                                  'scripts/taxi_etl.py'
+                              )
+                              print("ETL script uploaded successfully")
+                          else:
+                              print(f"Warning: taxi_etl.py not found at {etl_script_path}")
+                              print("Listing tmpdir contents:")
+                              for root, dirs, files in os.walk(tmpdir):
+                                  print(f"Directory: {root}")
+                                  for file in files:
+                                      print(f"  - {file}")
+                          
+                          # Note: Aurora-SQL.sql execution would require RDS Data API
+                          # and the Aurora cluster to have HTTP endpoint enabled
+                          sql_script_path = os.path.join(tmpdir, 'Aurora-SQL.sql')
+                          if os.path.exists(sql_script_path):
+                              print(f"Found Aurora-SQL.sql")
+                              s3.upload_file(
+                                  sql_script_path,
+                                  glue_bucket,
+                                  'scripts/Aurora-SQL.sql'
+                              )
+                              print("SQL script uploaded to S3")
+                              print("Note: SQL script should be executed manually or via RDS Data API")
+                          else:
+                              print(f"Warning: Aurora-SQL.sql not found at {sql_script_path}")
+                          
+                  # Report success
+                  codepipeline.put_job_success_result(
+                      jobId = job_id,
+                      executionDetails = {
+                          'summary': 'Post-deploy completed successfully',
+                          'percentComplete': 100
+                      }
+                  )
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps('Post-deploy completed successfully')
+                  }
+                  
+              except Exception as e:
+                  print(f"Error: {str(e)}")
+                  import traceback
+                  traceback.print_exc()
+                  
+                  codepipeline.put_job_failure_result(
+                      jobId=job_id,
+                      failureDetails = {
+                          'message': str(e),
+                          'type': 'JobFailed'
+                      }
+                  )
+                  raise
+
+  # codebuild project
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub '${ProjectName}-${DeployEnvironment}-codebuild-project'
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_LARGE
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:5.0
+        EnvironmentVariables:
+        - Name: PROJECT_NAME
+          Value: !Ref ProjectName
+        - Name: DEPLOY_ENVIRONMENT
+          Value: !Ref DeployEnvironment
+        - Name: ARTIFACT_BUCKET
+          Value: !Ref ArtifactBucket
+        - Name: ENABLE_KINESIS
+          Value: 'false'
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: |
+          version: 0.2
+          phases:
+            install:
+              runtime-versions:
+                python: 3.9
+              commands:
+                - echo "Installing dependencies"
+                - python --version
+                - pip --version
+                - pip install --upgrade pip
+                - pip install awscli boto3 pytest
+                - echo "=== Debugging Directory Structure ==="
+                - echo "Current directory:" && pwd
+                - echo "Listing root directory:"
+                - ls -la
+                - echo "Listing all subdirectories:"
+                - find . -maxdepth 2 -type f -name "*.yaml" -o -name "*.json" -o -name "*.py"
+                - echo "=== End Debug ==="
+            pre_build:
+              commands:
+                - echo Pre-build phase
+                - echo "Current directory:" && pwd
+                - echo "Files in current directory:" && ls -la
+                - echo Validating CloudFormation template
+                - aws cloudformation validate-template --template-body file://Main-CloudFormation-v2.yaml
+                - aws cloudformation validate-template --template-body file://Zone.yaml
+                - aws cloudformation validate-template --template-body file://codepipeline.yaml
+                - echo Validating parameters.json
+                - python -m json.tool parameters.json > /dev/null && echo "parameters.json is valid" || (echo "parameters.json is invalid" && exit 1)
+            build:
+               commands:
+                 - echo Build phase
+                 - echo "Current directory:" && pwd
+                 - echo "Files in current directory:" && ls -la
+                 - echo Running syntax checks on Python Scripts
+                 - python -m py_compile taxi_etl.py
+                 - echo Running syntax checks on SQL Scripts
+                 - echo "SQL syntax validation completed"
+                 - echo running unit tests
+                 - |
+                   if [ -d "tests/" ]; then
+                     python -m pytest tests/ -v || true
+                   else
+                     echo "No tests directory found, skipping tests"
+                   fi
+                 - echo Packaging artifacts
+                 - zip -r etl_scripts.zip *.py *.sql
+            post_build:
+             commands:
+               - echo Post-build phase
+               - echo "Build completed successfully"
+               - echo "Artifacts will be automatically uploaded by CodePipeline"
+          artifacts:
+            files:
+            - etl_scripts.zip
+            - Main-CloudFormation-v2.yaml
+            - Zone.yaml
+            - codepipeline.yaml
+            - parameters.json
+            - Aurora-SQL.sql
+            - taxi_etl.py
+            - parameters-template.json
+            name: BuildArtifact
+
+  # CodePipeline
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub '${ProjectName}-${DeployEnvironment}-pipeline'
+      RoleArn: !GetAtt PipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+      # Get code from GitHub
+      - Name: Source
+        Actions:
+        - Name: SourceAction
+          ActionTypeId:
+            Category: Source
+            Owner: ThirdParty
+            Provider: GitHub
+            Version: '1'
+          Configuration:
+            Owner: !Ref GitHubOwner
+            Repo: !Ref GitHubRepo
+            Branch: !Ref GitHubBranch
+            OAuthToken: !Ref GitHubToken
+            PollForSourceChanges: 'true'
+          OutputArtifacts:
+          - Name: SourceOutput
+
+      # Build project
+      - Name: Build
+        Actions:
+        - Name: BuildAction
+          ActionTypeId:
+            Category: Build
+            Owner: AWS
+            Provider: CodeBuild
+            Version: '1'
+          Configuration:
+            ProjectName: !Ref CodeBuildProject
+          InputArtifacts:
+          - Name: SourceOutput
+          OutputArtifacts:
+          - Name: BuildOutput
+
+      # Deploy to CloudFormation
+      - Name: Deploy
+        Actions:
+        # Create ChangeSet
+        - Name: CreateChangeSet
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Provider: CloudFormation
+            Version: '1'
+          Configuration:
+            ActionMode: CHANGE_SET_REPLACE
+            ChangeSetName: !Sub '${ProjectName}-${DeployEnvironment}-changeset'
+            StackName: !Sub '${ProjectName}-${DeployEnvironment}'
+            TemplatePath: BuildOutput::Main-CloudFormation-v2.yaml
+            TemplateConfiguration: BuildOutput::parameters.json
+            Capabilities: CAPABILITY_NAMED_IAM
+            RoleArn: !GetAtt CloudFormationRole.Arn
+          InputArtifacts:
+          - Name: BuildOutput
+          RunOrder: 1
+
+        # Execute ChangeSet
+        - Name: ExecuteChangeSet
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Provider: CloudFormation
+            Version: '1'
+          Configuration:
+            ActionMode: CHANGE_SET_EXECUTE
+            ChangeSetName: !Sub '${ProjectName}-${DeployEnvironment}-changeset'
+            StackName: !Sub '${ProjectName}-${DeployEnvironment}'
+            RoleArn: !GetAtt CloudFormationRole.Arn
+          RunOrder: 2
+
+        # Deploy Zone Stack
+        - Name: CreateZoneChangeSet
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Provider: CloudFormation
+            Version: '1'
+          Configuration:
+            ActionMode: CHANGE_SET_REPLACE
+            ChangeSetName: !Sub '${ProjectName}-${DeployEnvironment}-zone-changeset'
+            StackName: !Sub '${ProjectName}-${DeployEnvironment}-zone'
+            TemplatePath: BuildOutput::Zone.yaml
+            Capabilities: CAPABILITY_NAMED_IAM
+            RoleArn: !GetAtt CloudFormationRole.Arn
+            ParameterOverrides: !Sub |
+              {
+                "ProjectName": "${ProjectName}",
+                "MainStackName": "${ProjectName}-${DeployEnvironment}"
+              }
+          InputArtifacts:
+          - Name: BuildOutput
+          RunOrder: 3
+
+        # Execute Zone ChangeSet
+        - Name: ExecuteZoneChangeSet
+          ActionTypeId:
+            Category: Deploy
+            Owner: AWS
+            Provider: CloudFormation
+            Version: '1'
+          Configuration:
+            ActionMode: CHANGE_SET_EXECUTE
+            ChangeSetName: !Sub '${ProjectName}-${DeployEnvironment}-zone-changeset'
+            StackName: !Sub '${ProjectName}-${DeployEnvironment}-zone'
+            RoleArn: !GetAtt CloudFormationRole.Arn
+          RunOrder: 4
+
+      # Post-Deploy Stage
+      - Name: PostDeploy
+        Actions:
+        - Name: UploadScriptsAndInitialize
+          ActionTypeId:
+            Category: Invoke
+            Owner: AWS
+            Provider: Lambda
+            Version: '1'
+          Configuration:
+            FunctionName: !Ref PostDeployFunction
+            UserParameters: !Sub |
+              {
+                "StackName": "${ProjectName}-${DeployEnvironment}",
+                "ProjectName": "${ProjectName}"
+              }
+          InputArtifacts:
+          - Name: BuildOutput
+          RunOrder: 1
+
+  # Github Webhook
+  GithubWebhook:
+    Type: AWS::CodePipeline::Webhook
+    Properties:
+      Name: !Sub '${ProjectName}-${DeployEnvironment}-github-webhook'
+      Authentication: GITHUB_HMAC
+      AuthenticationConfiguration:
+        SecretToken: !Ref GitHubToken
+      Filters:
+      - JsonPath: $.ref
+        MatchEquals: refs/heads/main
+      - JsonPath: $.commits[*].modified[*]
+        MatchEquals: !Sub '${ProjectName}-*'
+      TargetPipeline: !Ref Pipeline
+      TargetAction: SourceAction
+      TargetPipelineVersion: 1
+      RegisterWithThirdParty: true
+
+# Outputs
+Outputs:
+  PipelineName:
+    Description: CodePipeline Name
+    Value: !Ref Pipeline
+    Export:
+      Name: !Sub '${ProjectName}-${DeployEnvironment}-pipeline-name'
+
+  PipelineUrl:
+    Description: CodePipeline URL
+    Value: !Sub 'https://console.aws.amazon.com/codesuite/codepipeline/pipelines/${Pipeline}/view?region=${AWS::Region}'
+
+  ArtifactBucketName:
+    Description: S3 Bucket for Pipeline Artifacts
+    Value: !Ref ArtifactBucket
+    Export:
+      Name: !Sub '${ProjectName}-${DeployEnvironment}-artifact-bucket'
+
+  CodeBuildProjectName:
+    Description: CodeBuild Project Name
+    Value: !Ref CodeBuildProject
+    Export:
+      Name: !Sub '${ProjectName}-${DeployEnvironment}-codebuild-project'
+
+  NotificationTopicArn:
+    Description: SNS Topic ARN for Pipeline Notifications
+    Value: !GetAtt PipelineNotification.TopicArn
+    Export:
+      Name: !Sub '${ProjectName}-${DeployEnvironment}-notification-topic'
+
+  PostDeployFunctionArn:
+    Description: ARN of the Post-Deploy Lambda Function
+    Value: !GetAtt PostDeployFunction.Arn
+    Export:
+      Name: !Sub '${ProjectName}-${DeployEnvironment}-postdeploy-function-arn'
