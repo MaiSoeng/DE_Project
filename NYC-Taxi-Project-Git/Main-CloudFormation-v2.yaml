@@ -45,21 +45,6 @@ Parameters:
     AllowedValues: [ 'true', 'false' ]
     Description: Optionally enable Kinesis Streaming for real-time data ingestion
 
-  ExistingS3EndpointId:
-    Type: String
-    Default: 'vpce-0040fd9b8ebf9ecf8'
-    Description: ID of existing S3 Gateway VPC Endpoint
-
-  ExistingSecretsManagerEndpointId:
-    Type: String
-    Default: 'vpce-04c2f6209f4f97946'
-    Description: ID of existing Secrets Manager Interface VPC Endpoint
-
-  ExistingMonitoringEndpointId:
-    Type: String
-    Default: 'vpce-00daba060f81791cd'
-    Description: ID of existing CloudWatch Monitoring Interface VPC Endpoint
-
 Resources:
   # Create an S3 bucket for raw NYC Taxi data
   RawDataBucket:
