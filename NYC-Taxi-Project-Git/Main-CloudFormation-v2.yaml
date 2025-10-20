@@ -188,7 +188,6 @@ Resources:
         Value: !Sub '${ProjectName}-vpce-sg'
 
   # VPC Endpoints Configuration
-  # Using existing endpoints where possible to avoid duplication and costs
 
   # Create Glue endpoint
   GlueEndpoint:
