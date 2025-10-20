@@ -265,25 +265,7 @@ Resources:
           # Glue 
           - Effect: Allow
             Action:
-            - glue:CreateJob
-            - glue:DeleteJob
-            - glue:GetJob
-            - glue:GetJobs
-            - glue:UpdateJob
-            - glue:StartJobRun
-            - glue:StopJobRun
-            - glue:GetJobRun
-            - glue:GetJobRuns
-            - glue:CreateConnection
-            - glue:DeleteConnection
-            - glue:GetConnection
-            - glue:GetConnections
-            - glue:CreateCrawler
-            - glue:DeleteCrawler
-            - glue:GetCrawler
-            - glue:UpdateCrawler
-            - glue:StartCrawler
-            - glue:StopCrawler
+            - glue:*
             Resource: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:*'
 
           # RDS 
@@ -295,23 +277,13 @@ Resources:
           # Secrets Manager 
           - Effect: Allow
             Action:
-            - secretsmanager:CreateSecret
-            - secretsmanager:DeleteSecret
-            - secretsmanager:GetSecretValue
-            - secretsmanager:PutSecretValue
-            - secretsmanager:UpdateSecret
-            - secretsmanager:DescribeSecret
+            - secretsmanager:*
             Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}-*'
 
           # SNS 
           - Effect: Allow
             Action:
-            - sns:CreateTopic
-            - sns:DeleteTopic
-            - sns:GetTopicAttributes
-            - sns:SetTopicAttributes
-            - sns:Subscribe
-            - sns:Unsubscribe
+            - sns:*
             Resource: !Sub 'arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ProjectName}-*'
 
           # VPC 
@@ -323,14 +295,7 @@ Resources:
           # CloudWatch 
           - Effect: Allow
             Action:
-            - logs:CreateLogGroup
-            - logs:DeleteLogGroup
-            - logs:DescribeLogGroups
-            - logs:PutRetentionPolicy
-            - logs:DeleteRetentionPolicy
-            - logs:DescribeLogStreams
-            - logs:DeleteLogStream
-            - logs:PutLogEvents
+            - logs:*
             Resource:
             - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/glue/${ProjectName}-*'
             - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-*'
@@ -341,33 +306,13 @@ Resources:
           # Lambda 
           - Effect: Allow
             Action:
-            - lambda:CreateFunction
-            - lambda:DeleteFunction
-            - lambda:GetFunction
-            - lambda:UpdateFunctionCode
-            - lambda:UpdateFunctionConfiguration
-            - lambda:ListFunctions
-            - lambda:PublishVersion
-            - lambda:GetFunctionConfiguration
-            - lambda:AddPermission
-            - lambda:RemovePermission
-            - lambda:InvokeFunction
-            - lambda:TagResource
-            - lambda:UntagResource
-            - lambda:ListTags
+            - lambda:*
             Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
 
           # EventBridge 
           - Effect: Allow
             Action:
-            - events:PutRule
-            - events:DeleteRule
-            - events:DescribeRule
-            - events:EnableRule
-            - events:DisableRule
-            - events:PutTargets
-            - events:RemoveTargets
-            - events:ListTargetsByRule
+            - events:*
             Resource: !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${ProjectName}-*'
 
   # IAM Role for Post-Deploy Lambda
