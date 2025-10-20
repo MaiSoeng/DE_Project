@@ -352,6 +352,13 @@ Resources:
             - ec2:DeleteVpcEndpoint
             - ec2:DescribeVpcEndpoints
             - ec2:ModifyVpcEndpoint
+            - ec2:DescribeSubnets
+            - ec2:DescribeVpcs
+            - ec2:DescribeRouteTables
+            - ec2:DescribeNetworkInterfaces
+            - ec2:CreateNetworkInterface
+            - ec2:DeleteNetworkInterface
+            - ec2:ModifyNetworkInterfaceAttribute
             Resource: '*'
 
           # CloudWatch 
