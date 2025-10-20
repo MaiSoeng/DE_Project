@@ -315,6 +315,12 @@ Resources:
             - events:*
             Resource: !Sub 'arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/${ProjectName}-*'
 
+          # QuickSight 
+          - Effect: Allow
+            Action:
+            - quicksight:*
+            Resource: '*'
+
   # IAM Role for Post-Deploy Lambda
   PostDeployLambdaRole:
     Type: AWS::IAM::Role
