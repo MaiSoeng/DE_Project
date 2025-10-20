@@ -239,10 +239,23 @@ Resources:
             - s3:PutBucketVersioning
             - s3:PutBucketPublicAccessBlock
             - s3:PutBucketLifecycleConfiguration
+            - s3:GetBucketLifecycleConfiguration
+            - s3:DeleteBucketLifecycleConfiguration
+            - s3:PutBucketCors
+            - s3:GetBucketCors
+            - s3:DeleteBucketCors
+            - s3:PutBucketNotification
+            - s3:GetBucketNotification
+            - s3:PutBucketTagging
+            - s3:GetBucketTagging
+            - s3:DeleteBucketTagging
             - s3:PutObject
             - s3:DeleteObject
             - s3:GetObject
             - s3:ListBucket
+            - s3:GetBucketLocation
+            - s3:GetBucketVersioning
+            - s3:GetBucketPublicAccessBlock
             Resource:
             - !Sub 'arn:aws:s3:::${ProjectName}-*'
             - !Sub 'arn:aws:s3:::${ProjectName}-*/*'
