@@ -233,10 +233,64 @@ Resources:
       - Key: Name
         Value: !Sub '${ProjectName}-vpce-logs'
 
-  # Note: Using existing VPC endpoints
-  # - S3 Gateway: !Ref ExistingS3EndpointId
-  # - Secrets Manager: !Ref ExistingSecretsManagerEndpointId  
-  # - Monitoring: !Ref ExistingMonitoringEndpointId
+  # Create S3 Interface endpoint
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: [ !Ref VPCEndpointSG ]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal: '*'
+          Action:
+          - s3:GetObject
+          - s3:PutObject
+          - s3:DeleteObject
+          - s3:ListBucket
+          Resource:
+          - !Sub 'arn:aws:s3:::${RawDataBucket}/*'
+          - !Sub 'arn:aws:s3:::${ProcessedDataBucket}/*'
+          - !Sub 'arn:aws:s3:::${GlueBucket}/*'
+          - !GetAtt RawDataBucket.Arn
+          - !GetAtt ProcessedDataBucket.Arn
+          - !GetAtt GlueBucket.Arn
+      Tags:
+      - Key: Name
+        Value: !Sub '${ProjectName}-vpce-s3'
+
+  # Create Secrets Manager endpoint
+  SecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.secretsmanager'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: [ !Ref VPCEndpointSG ]
+      Tags:
+      - Key: Name
+        Value: !Sub '${ProjectName}-vpce-secretsmanager'
+
+  # Create CloudWatch Monitoring endpoint
+  CloudWatchMonitoringEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.monitoring'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds: !Ref SubnetIds
+      SecurityGroupIds: [ !Ref VPCEndpointSG ]
+      Tags:
+      - Key: Name
+        Value: !Sub '${ProjectName}-vpce-monitoring'
 
   # Lambda function to download NYC Taxi data from official TLC source
   DataDownloadLambda:
