@@ -1,0 +1,423 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation template for Project NYC Taxi
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: project-nyc-taxi
+    Description: Project name
+
+Resources:
+  # crawler for zones reference data
+  ZoneDataCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub '${ProjectName}-zones-crawler'
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-glue-service-role'
+      DatabaseName:
+        Fn::ImportValue:
+          Fn::Sub: '${ProjectName}-glue-database'
+      Targets:
+        S3Targets:
+        - Path: !Sub
+            - 's3://${RawDataBucket}/reference-data/'
+            - RawDataBucket:
+                Fn::ImportValue:
+                  Fn::Sub: '${ProjectName}-raw-data-bucket'
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: DEPRECATE_IN_DATABASE
+
+  # Lambda function to download Zone lookup CSV file
+  ZoneDataDownloadLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-zone-data-downloader'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt ZoneDataDownloadRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          RAW_DATA_BUCKET:
+            Fn::ImportValue:
+              Fn::Sub: '${ProjectName}-raw-data-bucket'
+          PROJECT_NAME: !Ref ProjectName
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import logging
+          import urllib.request
+          import urllib.error
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          s3_client = boto3.client('s3')
+
+          def lambda_handler(event, context):
+              try:
+                  logger.info("Start NYC Taxi Zone Lookup data download")
+                  
+                  bucket_name = os.environ['RAW_DATA_BUCKET']
+                  
+                  # NYC TLC official zone lookup CSV URL
+                  zone_lookup_url = "https://d37ci6vzurychx.cloudfront.net/misc/taxi_zone_lookup.csv"
+                  s3_key = "reference-data/taxi_zone_lookup.csv"
+                  
+                  logger.info(f"Download zone lookup from: {zone_lookup_url}")
+                  
+                  # Download file from URL
+                  request = urllib.request.Request(zone_lookup_url)
+                  request.add_header('User-Agent', 'Mozilla/5.0')
+                  
+                  with urllib.request.urlopen(request, timeout=60) as response:
+                      file_data = response.read()
+                      logger.info(f"Download {len(file_data)} bytes")
+                      
+                      # Upload to S3
+                      s3_client.put_object(
+                          Bucket=bucket_name,
+                          Key=s3_key,
+                          Body=file_data,
+                          ServerSideEncryption='AES256',
+                          ContentType='text/csv'
+                      )
+                      logger.info(f"Upload zone lookup to s3://{bucket_name}/{s3_key}")
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({
+                          'message': 'Zone lookup CSV downloaded',
+                          's3_location': f's3://{bucket_name}/{s3_key}'
+                      })
+                  }
+                  
+              except urllib.error.HTTPError as e:
+                  logger.error(f"HTTP error {e.code}: {e.reason}")
+                  return {
+                      'statusCode': e.code,
+                      'body': json.dumps({'error': f'HTTP Error: {e.reason}'})
+                  }
+              except Exception as e:
+                  logger.error(f"Error download zone lookup: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({'error': str(e)})
+                  }
+
+  # IAM Role for Zone Data Download Lambda
+  ZoneDataDownloadRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-zone-data-download-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+      - PolicyName: S3Access
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:PutObject
+            - s3:PutObjectAcl
+            - s3:GetObject
+            - s3:ListBucket
+            Resource:
+            - Fn::Sub:
+              - 'arn:aws:s3:::${RawDataBucket}/*'
+              - RawDataBucket:
+                  Fn::ImportValue:
+                    Fn::Sub: '${ProjectName}-raw-data-bucket'
+            - Fn::Sub:
+              - 'arn:aws:s3:::${RawDataBucket}'
+              - RawDataBucket:
+                  Fn::ImportValue:
+                    Fn::Sub: '${ProjectName}-raw-data-bucket'
+
+  # Trigger Lambda to trigger zone data download on stack creation
+  TriggerZoneDownloadLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-trigger-zone-download'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt TriggerZoneDownloadRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import logging
+          import urllib3
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          lambda_client = boto3.client('lambda')
+          http = urllib3.PoolManager()
+
+          def send_response(event, context, response_status, response_data):
+              response_body = json.dumps({
+                  'Status': response_status,
+                  'Reason': f'See CloudWatch Log Stream: {context.log_stream_name}',
+                  'PhysicalResourceId': context.log_stream_name,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+                  'Data': response_data
+              })
+              
+              try:
+                  http.request('PUT', event['ResponseURL'], body=response_body,
+                              headers={'Content-Type': 'application/json'})
+                  logger.info('Send response to CloudFormation')
+              except Exception as e:
+                  logger.error(f'Error send response: {str(e)}')
+
+          def lambda_handler(event, context):
+              logger.info(f'Received event: {json.dumps(event)}')
+              
+              try:
+                  request_type = event['RequestType']
+                  zone_download_function = event['ResourceProperties']['ZoneDownloadFunction']
+                  
+                  if request_type == 'Delete':
+                      logger.info('Delete request - no action')
+                      send_response(event, context, 'SUCCESS', {'Message': 'Resource deleted'})
+                      return
+                  
+                  if request_type in ['Create', 'Update']:
+                      logger.info(f'Triggering zone data download Lambda: {zone_download_function}')
+                      
+                      # Invoke the zone download Lambda asynchronously
+                      response = lambda_client.invoke(
+                          FunctionName=zone_download_function,
+                          InvocationType='Event'  # Asynchronous invocation
+                      )
+                      
+                      logger.info(f'Zone data download Lambda triggered')
+                      send_response(event, context, 'SUCCESS', {
+                          'Message': 'Zone data download Lambda triggered',
+                          'StatusCode': response['StatusCode']
+                      })
+                      return
+                      
+              except Exception as e:
+                  logger.error(f'Error trigger zone data download: {str(e)}')
+                  send_response(event, context, 'FAILED', {'Message': str(e)})
+
+  # IAM Role for Trigger Lambda
+  TriggerZoneDownloadRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-trigger-zone-download-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+      - PolicyName: InvokeLambda
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - lambda:InvokeFunction
+            Resource:
+            - !GetAtt ZoneDataDownloadLambda.Arn
+
+  # Custom Resource to trigger zone data download on stack creation
+  TriggerZoneDownload:
+    Type: Custom::TriggerZoneDownload
+    DependsOn:
+    - ZoneDataDownloadLambda
+    Properties:
+      ServiceToken: !GetAtt TriggerZoneDownloadLambda.Arn
+      ZoneDownloadFunction: !Ref ZoneDataDownloadLambda
+
+  # IAM Role for lambda 
+  ZoneLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-zone-lambda-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+      - PolicyName: ZoneCrawlerAccess
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - glue:StartCrawler
+            - glue:GetCrawler
+            - glue:GetCrawlerMetrics
+            - glue:StopCrawler
+            Resource:
+            - !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:crawler/${ProjectName}-zones-crawler'
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'
+
+  # lambda function to automatically start zone crawler 
+  ZoneCrawlerTriggerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub '${ProjectName}-zone-crawler-trigger'
+      Runtime: python3.9
+      Handler: index.lambda_handler
+      Role: !GetAtt ZoneLambdaRole.Arn
+      Timeout: 300
+      MemorySize: 256
+      Environment:
+        Variables:
+          ZONE_CRAWLER_NAME: !Ref ZoneDataCrawler
+          PROJECT_NAME: !Ref ProjectName
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import logging
+          from datetime import datetime
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          glue_client = boto3.client('glue')
+
+          def lambda_handler(event, context):
+              try:
+                  zone_crawler_name = os.environ['ZONE_CRAWLER_NAME']
+                  
+                  logger.info("Reference data upload, start zone crawler")
+                  
+                  # Get S3 event details
+                  if 'Records' in event and event['Records']:
+                      for record in event['Records']:
+                          if 'eventName' in record and record['eventName'].startswith('ObjectCreated'):
+                              bucket = record['s3']['bucket']['name']
+                              key = record['s3']['object']['key']
+                              logger.info(f"New reference file uploaded: s3://{bucket}/{key}")
+                  
+                  # Check if zone crawler is already running
+                  try:
+                      crawler_response = glue_client.get_crawler(Name = zone_crawler_name)
+                      crawler_state = crawler_response['Crawler']['State']
+                      
+                      if crawler_state == 'RUNNING':
+                          logger.info("Zone crawler is already running")
+                          return {
+                              'statusCode': 200,
+                              'body': json.dumps(f'Zone crawler is already running')
+                          }
+                  except Exception as e:
+                      logger.warning(f"Could not check zone crawler status: {str(e)}")
+                  
+                  # Start the zone crawler
+                  glue_client.start_crawler(Name = zone_crawler_name)
+                  logger.info(f"Successfully started zone crawler")
+                  
+                  return {
+                      'statusCode': 200,
+                      'body': json.dumps({
+                          'message': f'Successfully started zone crawler'
+                      })
+                  }
+                  
+              except Exception as e:
+                  logger.error(f"Error in zone crawler automation: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'body': json.dumps({
+                          'error': str(e)
+                      })
+                  }
+
+  # EventBridge Rule for S3 Object Creation in reference-data folder
+  S3ZoneDataUploadRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub '${ProjectName}-zone-data-uploaded'
+      Description: Trigger zone crawler when reference data is uploaded to S3
+      EventPattern:
+        source:
+        - aws.s3
+        detail-type:
+        - Object Created
+        detail:
+          bucket:
+            name:
+            - Fn::ImportValue:
+                Fn::Sub: '${ProjectName}-raw-data-bucket'
+          object:
+            key:
+            - suffix: '.csv'
+      State: ENABLED
+      Targets:
+      - Arn: !GetAtt ZoneCrawlerTriggerLambda.Arn
+        Id: ZoneCrawlerTriggerTarget
+
+  # permission for EventBridge to invoke zone crawler Lambda
+  S3ZoneEventLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ZoneCrawlerTriggerLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt S3ZoneDataUploadRule.Arn
+
+Outputs:
+  ZoneCrawlerName:
+    Description: Name of the Glue crawler for zone reference data
+    Value: !Ref ZoneDataCrawler
+    Export:
+      Name: !Sub '${ProjectName}-zone-crawler-name'
+
+  ZoneCrawlerTriggerLambda:
+    Description: ARN of the zone crawler trigger Lambda function
+    Value: !GetAtt ZoneCrawlerTriggerLambda.Arn
+    Export:
+      Name: !Sub '${ProjectName}-zone-crawler-lambda-arn'
+
+  ZoneDataDownloadLambda:
+    Description: ARN of the zone data download Lambda function
+    Value: !GetAtt ZoneDataDownloadLambda.Arn
+    Export:
+      Name: !Sub '${ProjectName}-zone-data-download-lambda-arn'
+
+  ZoneDataLocation:
+    Description: S3 path for zone data upload
+    Value: !Sub
+      - 's3://${RawDataBucket}/reference-data/'
+      - RawDataBucket:
+          Fn::ImportValue:
+            Fn::Sub: '${ProjectName}-raw-data-bucket'
