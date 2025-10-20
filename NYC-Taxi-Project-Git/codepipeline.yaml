@@ -317,24 +317,7 @@ Resources:
           # VPC 
           - Effect: Allow
             Action:
-            - ec2:CreateSecurityGroup
-            - ec2:DeleteSecurityGroup
-            - ec2:DescribeSecurityGroups
-            - ec2:AuthorizeSecurityGroupIngress
-            - ec2:AuthorizeSecurityGroupEgress
-            - ec2:RevokeSecurityGroupIngress
-            - ec2:RevokeSecurityGroupEgress
-            - ec2:CreateVpcEndpoint
-            - ec2:DeleteVpcEndpoint
-            - ec2:DescribeVpcEndpoints
-            - ec2:ModifyVpcEndpoint
-            - ec2:DescribeSubnets
-            - ec2:DescribeVpcs
-            - ec2:DescribeRouteTables
-            - ec2:DescribeNetworkInterfaces
-            - ec2:CreateNetworkInterface
-            - ec2:DeleteNetworkInterface
-            - ec2:ModifyNetworkInterfaceAttribute
+            - ec2:*
             Resource: '*'
 
           # CloudWatch 
