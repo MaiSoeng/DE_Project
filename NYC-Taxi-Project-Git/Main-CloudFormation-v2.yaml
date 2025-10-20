@@ -21,6 +21,11 @@ Parameters:
     Type: List<String>
     Description: AZ names corresponding to SubnetIds
 
+  RouteTableIds:
+    Type: CommaDelimitedList
+    Description: Route table IDs for the VPC (required for S3 Gateway endpoint)
+    Default: "rtb-0c3d34139955980d2,rtb-07bb5a4a52ca1fead"
+
   DBName:
     Type: String
     Default: taxidata
@@ -217,16 +222,14 @@ Resources:
       - Key: Name
         Value: !Sub '${ProjectName}-vpce-logs'
 
-  # Create S3 Interface endpoint
+  # Create S3 Gateway endpoint
   S3Endpoint:
     Type: AWS::EC2::VPCEndpoint
     Properties:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
-      VpcEndpointType: Interface
-      PrivateDnsEnabled: true
-      SubnetIds: !Ref SubnetIds
-      SecurityGroupIds: [ !Ref VPCEndpointSG ]
+      VpcEndpointType: Gateway
+      RouteTableIds: !Ref RouteTableIds
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
