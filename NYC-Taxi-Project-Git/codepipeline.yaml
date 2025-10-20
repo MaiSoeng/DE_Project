@@ -368,7 +368,14 @@ Resources:
             - logs:DeleteLogGroup
             - logs:DescribeLogGroups
             - logs:PutRetentionPolicy
-            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/glue/${ProjectName}-*'
+            - logs:DeleteRetentionPolicy
+            - logs:DescribeLogStreams
+            - logs:DeleteLogStream
+            - logs:PutLogEvents
+            Resource:
+            - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/glue/${ProjectName}-*'
+            - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-*'
+            - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/glue/jobs/${ProjectName}-*'
 
           # Lambda 
           - Effect: Allow
@@ -384,6 +391,9 @@ Resources:
             - lambda:AddPermission
             - lambda:RemovePermission
             - lambda:InvokeFunction
+            - lambda:TagResource
+            - lambda:UntagResource
+            - lambda:ListTags
             Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
 
           # EventBridge 
