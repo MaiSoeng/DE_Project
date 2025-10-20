@@ -311,9 +311,19 @@ Resources:
             - rds:CreateDBParameterGroup
             - rds:DeleteDBParameterGroup
             - rds:DescribeDBParameterGroups
+            - rds:CreateDBClusterParameterGroup
+            - rds:DeleteDBClusterParameterGroup
+            - rds:DescribeDBClusterParameterGroups
+            - rds:ModifyDBClusterParameterGroup
             - rds:CreateDBSubnetGroup
             - rds:DeleteDBSubnetGroup
             - rds:DescribeDBSubnetGroups
+            - rds:AddTagsToResource
+            - rds:RemoveTagsFromResource
+            - rds:ListTagsForResource
+            - rds:CreateDBClusterSnapshot
+            - rds:DeleteDBClusterSnapshot
+            - rds:DescribeDBClusterSnapshots
             Resource: !Sub 'arn:aws:rds:${AWS::Region}:${AWS::AccountId}:*'
 
           # Secrets Manager 
