@@ -1378,27 +1378,26 @@ Outputs:
     Export:
       Name: !Sub '${ProjectName}-quicksight-vpc-role-arn'
 
-  # Existing VPC Endpoints Information
-  ExistingS3EndpointId:
-    Description: ID of existing S3 Gateway VPC Endpoint
-    Value: !Ref ExistingS3EndpointId
+  # VPC Endpoints Information
+  S3EndpointId:
+    Description: ID of S3 Interface VPC Endpoint
+    Value: !Ref S3Endpoint
 
-  ExistingSecretsManagerEndpointId:
-    Description: ID of existing Secrets Manager Interface VPC Endpoint
-    Value: !Ref ExistingSecretsManagerEndpointId
-
-  ExistingMonitoringEndpointId:
-    Description: ID of existing CloudWatch Monitoring Interface VPC Endpoint
-    Value: !Ref ExistingMonitoringEndpointId
-
-  # CloudFormation Created Endpoints
   GlueEndpointId:
-    Description: ID of CloudFormation created Glue Interface VPC Endpoint
+    Description: ID of Glue Interface VPC Endpoint
     Value: !Ref GlueEndpoint
 
   CloudWatchLogsEndpointId:
-    Description: ID of CloudFormation created CloudWatch Logs Interface VPC Endpoint
+    Description: ID of CloudWatch Logs Interface VPC Endpoint
     Value: !Ref CloudWatchLogsEndpoint
+
+  SecretsManagerEndpointId:
+    Description: ID of Secrets Manager Interface VPC Endpoint
+    Value: !Ref SecretsManagerEndpoint
+
+  CloudWatchMonitoringEndpointId:
+    Description: ID of CloudWatch Monitoring Interface VPC Endpoint
+    Value: !Ref CloudWatchMonitoringEndpoint
 
   # Data Download Lambda
   DataDownloadLambdaArn:
