@@ -202,17 +202,24 @@ Resources:
                   if request_type in ['Create', 'Update']:
                       logger.info(f'Triggering zone data download Lambda: {zone_download_function}')
                       
-                      # Invoke the zone download Lambda asynchronously
+                      # Invoke the zone download Lambda synchronously
                       response = lambda_client.invoke(
                           FunctionName=zone_download_function,
-                          InvocationType='Event'  # Asynchronous invocation
+                          InvocationType='RequestResponse'  # Synchronous invocation
                       )
                       
-                      logger.info(f'Zone data download Lambda triggered')
-                      send_response(event, context, 'SUCCESS', {
-                          'Message': 'Zone data download Lambda triggered',
-                          'StatusCode': response['StatusCode']
-                      })
+                      # Check if zone data download was successful
+                      if response['StatusCode'] == 200:
+                          logger.info(f'Zone data download Lambda completed successfully')
+                          send_response(event, context, 'SUCCESS', {
+                              'Message': 'Zone data download completed successfully',
+                              'StatusCode': response['StatusCode']
+                          })
+                      else:
+                          logger.error(f'Zone data download Lambda failed with status: {response["StatusCode"]}')
+                          send_response(event, context, 'FAILED', {
+                              'Message': f'Zone data download failed with status: {response["StatusCode"]}'
+                          })
                       return
                       
               except Exception as e:
@@ -241,8 +248,13 @@ Resources:
           - Effect: Allow
             Action:
             - lambda:InvokeFunction
+            - lambda:InvokeAsync
+            - lambda:*
             Resource:
             - !GetAtt ZoneDataDownloadLambda.Arn
+            - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
+            - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*'
+            - '*'
 
   # Custom Resource to trigger zone data download on stack creation
   TriggerZoneDownload:
