@@ -557,7 +557,7 @@ Resources:
       FunctionName: !Ref PostDeployFunction
       Action: lambda:InvokeFunction
       Principal: codepipeline.amazonaws.com
-      SourceArn: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${Pipeline}'
+      SourceArn: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${ProjectName}-${DeployEnvironment}-pipeline'
 
   # codebuild project
   CodeBuildProject:
