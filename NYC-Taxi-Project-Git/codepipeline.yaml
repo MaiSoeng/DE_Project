@@ -386,13 +386,6 @@ Resources:
             - logs:CreateLogStream
             - logs:PutLogEvents
             Resource: '*'
-          - Effect: Allow
-            Action:
-            - lambda:InvokeFunction
-            - lambda:InvokeAsync
-            Resource:
-            - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
-            - '*'
 
   # Lambda Function for Post-Deploy Tasks
   PostDeployFunction:
@@ -531,6 +524,15 @@ Resources:
                       }
                   )
                   raise
+
+  # Permission for CodePipeline to invoke Post-Deploy Lambda
+  PostDeployLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref PostDeployFunction
+      Action: lambda:InvokeFunction
+      Principal: codepipeline.amazonaws.com
+      SourceArn: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${Pipeline}'
 
   # codebuild project
   CodeBuildProject:
