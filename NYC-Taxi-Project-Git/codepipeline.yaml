@@ -346,17 +346,26 @@ Resources:
         PolicyDocument:
           Version: '2012-10-17'
           Statement:
+          # S3 Object 
           - Effect: Allow
             Action:
-            - s3:PutObject
             - s3:GetObject
-            - s3:ListBucket
-            - s3:GetBucketLocation
+            - s3:PutObject
             Resource:
-            - !Sub 'arn:aws:s3:::${ProjectName}-*'
             - !Sub 'arn:aws:s3:::${ProjectName}-*/*'
             - !Sub 'arn:aws:s3:::${ArtifactBucket}/*'
+
+          # S3 Bucket
+          - Effect: Allow
+            Action:
+            - s3:ListBucket
+            - s3:GetBucketLocation
+            - s3:GetBucketVersioning
+            Resource:
+            - !Sub 'arn:aws:s3:::${ProjectName}-*'
             - !GetAtt ArtifactBucket.Arn
+
+          # RDS
           - Effect: Allow
             Action:
             - rds:DescribeDBClusters
@@ -364,35 +373,44 @@ Resources:
             - rds-data:ExecuteStatement
             - rds-data:BatchExecuteStatement
             Resource: '*'
+
+          # Secrets Manager
           - Effect: Allow
             Action:
             - secretsmanager:GetSecretValue
             - secretsmanager:DescribeSecret
             Resource: !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${ProjectName}-*'
+
+          # CloudFormation
           - Effect: Allow
             Action:
             - cloudformation:DescribeStacks
             - cloudformation:DescribeStackResources
             - cloudformation:ListStackResources
             Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-*'
+
+          # CodePipeline
           - Effect: Allow
             Action:
             - codepipeline:PutJobSuccessResult
             - codepipeline:PutJobFailureResult
             Resource: '*'
+
+          # CloudWatch Logs
           - Effect: Allow
             Action:
             - logs:CreateLogGroup
             - logs:CreateLogStream
             - logs:PutLogEvents
-            Resource: '*'
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ProjectName}-*'
+
+          # Lambda
           - Effect: Allow
             Action:
             - lambda:InvokeFunction
             - lambda:InvokeAsync
             Resource:
             - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
-            - '*'
 
   # Lambda Function for Post-Deploy Tasks
   PostDeployFunction:
