@@ -303,6 +303,12 @@ Resources:
             - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws-glue/jobs/*'
             - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/glue/jobs/*'
 
+          # CloudWatch Alarms and Metrics
+          - Effect: Allow
+            Action:
+            - cloudwatch:*
+            Resource: '*'
+
           # Lambda 
           - Effect: Allow
             Action:
