@@ -247,14 +247,8 @@ Resources:
           Statement:
           - Effect: Allow
             Action:
-            - lambda:InvokeFunction
-            - lambda:InvokeAsync
             - lambda:*
-            Resource:
-            - !GetAtt ZoneDataDownloadLambda.Arn
-            - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
-            - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*'
-            - '*'
+            Resource: '*'
 
   # Custom Resource to trigger zone data download on stack creation
   TriggerZoneDownload:

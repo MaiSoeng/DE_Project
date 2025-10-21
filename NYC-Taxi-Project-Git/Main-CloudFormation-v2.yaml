@@ -640,14 +640,8 @@ Resources:
           Statement:
           - Effect: Allow
             Action:
-            - lambda:InvokeFunction
-            - lambda:InvokeAsync
             - lambda:*
-            Resource:
-            - !GetAtt DataDownloadLambda.Arn
-            - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
-            - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*'
-            - '*'
+            Resource: '*'
       - PolicyName: S3Access
         PolicyDocument:
           Version: '2012-10-17'
@@ -798,6 +792,19 @@ Resources:
             Action: iam:PassRole
             Resource:
             - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-glue-service-role'
+
+      - PolicyName: S3ScriptCheck
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:HeadObject
+            - s3:ListBucket
+            Resource:
+            - !Sub 'arn:aws:s3:::${GlueBucket}/*'
+            - !Sub 'arn:aws:s3:::${GlueBucket}'
             - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}--*'
             Condition:
               StringEquals:
@@ -1148,11 +1155,41 @@ Resources:
           logger.setLevel(logging.INFO)
 
           glue_client = boto3.client('glue')
+          s3_client = boto3.client('s3')
+
+          def check_etl_script_exists():
+            """Check if ETL script exists in S3"""
+            try:
+              # Get the Glue job details to find script location
+              job_response = glue_client.get_job(JobName=os.environ['ETL_NAME'])
+              script_location = job_response['Job']['Command']['ScriptLocation']
+              
+              # Extract bucket and key from script location
+              # Format: s3://bucket/key
+              script_path = script_location.replace('s3://', '')
+              bucket, key = script_path.split('/', 1)
+              
+              # Check if script exists
+              s3_client.head_object(Bucket=bucket, Key=key)
+              logger.info(f"ETL script exists: {script_location}")
+              return True
+              
+            except Exception as e:
+              logger.warning(f"ETL script not found: {str(e)}")
+              return False
 
           def lambda_handler(event, context):
             try:
               etl_name = os.environ['ETL_NAME']
-              logger.info(f"Crawler completes successfully, start: {etl_name}")
+              logger.info(f"Crawler completes successfully, checking ETL script for: {etl_name}")
+
+              # Check if ETL script exists
+              if not check_etl_script_exists():
+                logger.warning("ETL script not found, waiting for CodePipeline to upload it")
+                return {
+                  'statusCode': 202,
+                  'body': json.dumps('ETL script not found, waiting for upload')
+                }
 
               # check the status of the ETL job
               progress = {"STARTING", "RUNNING", "STOPPING"}
