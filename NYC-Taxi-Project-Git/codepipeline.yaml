@@ -386,6 +386,13 @@ Resources:
             - logs:CreateLogStream
             - logs:PutLogEvents
             Resource: '*'
+          - Effect: Allow
+            Action:
+            - lambda:InvokeFunction
+            - lambda:InvokeAsync
+            Resource:
+            - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
+            - '*'
 
   # Lambda Function for Post-Deploy Tasks
   PostDeployFunction:
