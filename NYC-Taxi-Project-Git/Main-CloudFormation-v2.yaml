@@ -137,6 +137,7 @@ Resources:
   # Security Group for RDS
   MyRDSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
+    DeletionPolicy: Delete
     Properties:
       GroupDescription: Security Group for RDS MySQL
       VpcId: !Ref VpcId
@@ -148,11 +149,12 @@ Resources:
         Description: Allow AWS Glue ETL to access RDS MySQL
       Tags:
       - Key: Name
-        Value: !Sub '${ProjectName}-database-security-group'
+        Value: !Sub '${ProjectName}-database-security-group-${AWS::StackName}'
 
   # Security Group for AWS Glue
   GlueSecurityGroup:
     Type: AWS::EC2::SecurityGroup
+    DeletionPolicy: Delete
     Properties:
       GroupDescription: Security Group for Glue ETL
       VpcId: !Ref VpcId
@@ -162,7 +164,7 @@ Resources:
         Description: Allow all outbound traffic
       Tags:
       - Key: Name
-        Value: !Sub '${ProjectName}-glue-security-group'
+        Value: !Sub '${ProjectName}-glue-security-group-${AWS::StackName}'
 
   # Self-referencing rule for Glue SG
   # This is to make sure that driver and executor can communicate
@@ -190,13 +192,14 @@ Resources:
         CidrIp: 0.0.0.0/0
       Tags:
       - Key: Name
-        Value: !Sub '${ProjectName}-vpce-sg'
+        Value: !Sub '${ProjectName}-vpce-sg-${AWS::StackName}'
 
   # VPC Endpoints Configuration
 
   # Create Glue endpoint
   GlueEndpoint:
     Type: AWS::EC2::VPCEndpoint
+    DeletionPolicy: Delete
     Properties:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.glue'
@@ -211,6 +214,7 @@ Resources:
   # Create CloudWatch Logs endpoint
   CloudWatchLogsEndpoint:
     Type: AWS::EC2::VPCEndpoint
+    DeletionPolicy: Delete
     Properties:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.logs'
@@ -225,6 +229,7 @@ Resources:
   # Create S3 Gateway endpoint
   S3Endpoint:
     Type: AWS::EC2::VPCEndpoint
+    DeletionPolicy: Delete
     Properties:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
@@ -254,6 +259,7 @@ Resources:
   # Create Secrets Manager endpoint
   SecretsManagerEndpoint:
     Type: AWS::EC2::VPCEndpoint
+    DeletionPolicy: Delete
     Properties:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.secretsmanager'
@@ -268,6 +274,7 @@ Resources:
   # Create CloudWatch Monitoring endpoint
   CloudWatchMonitoringEndpoint:
     Type: AWS::EC2::VPCEndpoint
+    DeletionPolicy: Delete
     Properties:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.monitoring'
@@ -1196,10 +1203,11 @@ Resources:
   # QuickSight VPC Connection for accessing RDS in private subnet
   QuickSightVPCConnection:
     Type: AWS::QuickSight::VPCConnection
+    DeletionPolicy: Delete
     Properties:
       AwsAccountId: !Ref AWS::AccountId
-      VPCConnectionId: !Sub '${ProjectName}-vpc-connection'
-      Name: !Sub '${ProjectName}-VPC-Connection'
+      VPCConnectionId: !Sub '${ProjectName}-vpc-connection-${AWS::StackName}'
+      Name: !Sub '${ProjectName}-VPC-Connection-${AWS::StackName}'
       SubnetIds: !Ref SubnetIds
       SecurityGroupIds:
       - !Ref QuickSightSecurityGroup
@@ -1214,7 +1222,7 @@ Resources:
   QuickSightVPCRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub '${ProjectName}-quicksight-vpc-role'
+      RoleName: !Sub '${ProjectName}-quicksight-vpc-role-${AWS::StackName}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -1253,6 +1261,7 @@ Resources:
   # Security Group for QuickSight VPC Connection
   QuickSightSecurityGroup:
     Type: AWS::EC2::SecurityGroup
+    DeletionPolicy: Delete
     Properties:
       GroupDescription: Security Group for QuickSight VPC Connection to access RDS
       VpcId: !Ref VpcId
@@ -1268,7 +1277,7 @@ Resources:
         Description: Allow all outbound traffic
       Tags:
       - Key: Name
-        Value: !Sub '${ProjectName}-quicksight-security-group'
+        Value: !Sub '${ProjectName}-quicksight-security-group-${AWS::StackName}'
 
   # Update RDS Security Group to allow QuickSight access
   RDSQuickSightIngress:
