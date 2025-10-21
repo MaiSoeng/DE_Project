@@ -112,6 +112,26 @@ Resources:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
 
+  # S3 Bucket Policy for GlueBucket
+  GlueBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref GlueBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS:
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-dev-postdeploy-role'
+          Action:
+          - s3:GetObject
+          - s3:PutObject
+          - s3:ListBucket
+          Resource:
+          - !Sub 'arn:aws:s3:::${GlueBucket}/*'
+          - !Sub 'arn:aws:s3:::${GlueBucket}'
+
   # DB Subnet Group
   DBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
