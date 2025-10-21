@@ -312,10 +312,13 @@ Resources:
           # Lambda 
           - Effect: Allow
             Action:
+            - lambda:InvokeFunction
+            - lambda:InvokeAsync
             - lambda:*
             Resource:
             - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
             - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*'
+            - '*'
 
           # EventBridge 
           - Effect: Allow

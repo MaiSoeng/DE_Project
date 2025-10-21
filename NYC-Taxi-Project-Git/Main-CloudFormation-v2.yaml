@@ -633,8 +633,10 @@ Resources:
           - Effect: Allow
             Action:
             - lambda:InvokeFunction
+            - lambda:InvokeAsync
             Resource:
             - !GetAtt DataDownloadLambda.Arn
+            - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
 
   # Custom Resource to trigger data download on stack creation
   TriggerDataDownload:
