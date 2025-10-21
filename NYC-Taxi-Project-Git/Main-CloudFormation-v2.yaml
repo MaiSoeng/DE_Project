@@ -1206,8 +1206,8 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       AwsAccountId: !Ref AWS::AccountId
-      VPCConnectionId: !Sub '${ProjectName}-vpc-connection-${AWS::StackName}'
-      Name: !Sub '${ProjectName}-VPC-Connection-${AWS::StackName}'
+      VPCConnectionId: !Sub '${ProjectName}-vpc-connection-${AWS::StackName}-${AWS::AccountId}'
+      Name: !Sub '${ProjectName}-VPC-Connection-${AWS::StackName}-${AWS::AccountId}'
       SubnetIds: !Ref SubnetIds
       SecurityGroupIds:
       - !Ref QuickSightSecurityGroup
