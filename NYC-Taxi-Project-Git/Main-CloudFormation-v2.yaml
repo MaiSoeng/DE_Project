@@ -911,6 +911,7 @@ Resources:
         DataLakePrincipalIdentifier: !GetAtt GlueJobRole.Arn
       Permissions:
       - DATA_LOCATION_ACCESS
+      PermissionsWithGrantOption: []
 
   # Create a Glue crawler
   GlueCrawler:
