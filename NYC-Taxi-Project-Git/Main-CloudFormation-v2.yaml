@@ -889,7 +889,7 @@ Resources:
     Type: AWS::LakeFormation::PrincipalPermissions
     Properties:
       Resource:
-        DatabaseResource:
+        Database:
           CatalogId: !Ref AWS::AccountId
           Name: !Ref GlueDatabase
       Principal:
@@ -911,7 +911,8 @@ Resources:
         DataLakePrincipalIdentifier: !GetAtt GlueJobRole.Arn
       Permissions:
       - DATA_LOCATION_ACCESS
-      PermissionsWithGrantOption: []
+      PermissionsWithGrantOption:
+      - DATA_LOCATION_ACCESS
 
   # Create a Glue crawler
   GlueCrawler:
