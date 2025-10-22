@@ -475,6 +475,7 @@ Resources:
             Resource:
             - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-*'
             - !Sub 'arn:aws:iam::${AWS::AccountId}:instance-profile/${ProjectName}-*'
+            - 'arn:aws:iam::*:role/AWSServiceRoleForLakeFormationDataAccess'
 
           # S3 
           - Effect: Allow

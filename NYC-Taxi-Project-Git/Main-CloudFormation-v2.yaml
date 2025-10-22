@@ -1060,6 +1060,14 @@ Resources:
             - logs:CreateLogStream
             - logs:PutLogEvents
             Resource: '*'
+          - Effect: Allow
+            Action:
+            - s3:GetObject
+            - s3:HeadObject
+            - s3:ListBucket
+            Resource:
+            - !GetAtt GlueBucket.Arn
+            - !Sub '${GlueBucket}/*'
 
   # Lambda function to start the crawler automatically
   CrawlerLambdaFunction:
@@ -1270,10 +1278,15 @@ Resources:
               # Check if ETL script exists
               if not check_etl_script_exists():
                 logger.warning("ETL script not found, waiting for CodePipeline to upload it")
-                return {
-                  'statusCode': 202,
-                  'body': json.dumps('ETL script not found, waiting for upload')
-                }
+                # Wait a bit and try again
+                import time
+                time.sleep(30)
+                if not check_etl_script_exists():
+                  logger.error("ETL script still not found after waiting")
+                  return {
+                    'statusCode': 500,
+                    'body': json.dumps('ETL script not found after waiting')
+                  }
 
               # check the status of the ETL job
               progress = {"STARTING", "RUNNING", "STOPPING"}
