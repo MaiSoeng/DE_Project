@@ -190,6 +190,10 @@ Resources:
             Action:
             - cloudformation:ValidateTemplate
             Resource: '*'
+          - Effect: Allow
+            Action:
+            - lambda:InvokeFunction
+            Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
 
   # IAM Role for CloudFormation
   CloudFormationRole:
