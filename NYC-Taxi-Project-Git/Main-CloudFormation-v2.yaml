@@ -1386,9 +1386,6 @@ Resources:
         ProjectName: !Ref ProjectName
         RawDataBucket: !Ref RawDataBucket
 
-Conditions:
-  EnableKinesis: !Equals [ !Ref EnableKinesisStreaming, 'true' ]
-
   # Post-Deploy Lambda Function
   PostDeployLambdaRole:
     Type: AWS::IAM::Role
@@ -1619,6 +1616,9 @@ Conditions:
       Action: lambda:InvokeFunction
       Principal: codepipeline.amazonaws.com
       SourceArn: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${ProjectName}-dev-pipeline'
+
+Conditions:
+  EnableKinesis: !Equals [ !Ref EnableKinesisStreaming, 'true' ]
 
 Outputs:
   RawDataBucket:
