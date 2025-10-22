@@ -516,6 +516,12 @@ Resources:
             - glue:*
             Resource: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:*'
 
+          # Lake Formation
+          - Effect: Allow
+            Action:
+            - lakeformation:*
+            Resource: '*'
+
           # RDS 
           - Effect: Allow
             Action:
