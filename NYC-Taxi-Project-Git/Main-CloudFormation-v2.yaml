@@ -884,6 +884,20 @@ Resources:
         Description: NYC taxi database for the project
         LocationUri: !Sub 's3://${RawDataBucket}/'
 
+  LakeFormationSettings:
+    Type: AWS::LakeFormation::DataLakeSettings
+    Properties:
+      Admins:
+      - DataLakePrincipalIdentifier: !GetAtt GlueJobRole.Arn
+      - DataLakePrincipalIdentifier: !Sub 'arn:aws:iam::${AWS::AccountId}:role/project-nyc-taxi-dev-cloudformation-role'
+
+  RawDataLocation:
+    Type: AWS::LakeFormation::Resource
+    Properties:
+      ResourceArn: !Sub 'arn:aws:s3:::${RawDataBucket}'
+      RoleArn: !GetAtt GlueJobRole.Arn
+      UseServiceLinkedRole: true
+
   # Lake Formation Database Permissions
   LakeFormationDatabasePermission:
     Type: AWS::LakeFormation::PrincipalPermissions
@@ -902,6 +916,7 @@ Resources:
   # Lake Formation Data Location Permissions
   LakeFormationDataLocationPermission:
     Type: AWS::LakeFormation::PrincipalPermissions
+    DependsOn: RawDataLocation
     Properties:
       Resource:
         DataLocation:

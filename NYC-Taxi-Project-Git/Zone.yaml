@@ -296,6 +296,18 @@ Resources:
             Action:
             - lakeformation:*
             Resource: '*'
+          - Effect: Allow
+            Action:
+            - lakeformation:PutDataLakeSettings
+            - lakeformation:GetDataLakeSettings
+            - lakeformation:RegisterResource
+            - lakeformation:DeregisterResource
+            - lakeformation:GrantPermissions
+            - lakeformation:RevokePermissions
+            - lakeformation:ListPermissions
+            - lakeformation:GetResource
+            - lakeformation:ListResources
+            Resource: '*'
 
   # lambda function to automatically start zone crawler 
   ZoneCrawlerTriggerLambda:

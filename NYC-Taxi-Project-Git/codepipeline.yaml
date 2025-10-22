@@ -522,6 +522,20 @@ Resources:
             - lakeformation:*
             Resource: '*'
 
+          # Lake Formation Admin permissions
+          - Effect: Allow
+            Action:
+            - lakeformation:PutDataLakeSettings
+            - lakeformation:GetDataLakeSettings
+            - lakeformation:RegisterResource
+            - lakeformation:DeregisterResource
+            - lakeformation:GrantPermissions
+            - lakeformation:RevokePermissions
+            - lakeformation:ListPermissions
+            - lakeformation:GetResource
+            - lakeformation:ListResources
+            Resource: '*'
+
           # RDS 
           - Effect: Allow
             Action:
