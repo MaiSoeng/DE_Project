@@ -848,6 +848,31 @@ Resources:
             - iam:PassRole
             Resource:
             - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-glue-service-role'
+          - Effect: Allow
+            Action:
+            - lakeformation:GrantPermissions
+            - lakeformation:RevokePermissions
+            - lakeformation:ListPermissions
+            - lakeformation:GetResourceLFTags
+            - lakeformation:PutResourceLFTags
+            - lakeformation:DeleteResourceLFTags
+            - lakeformation:GetDataLakeSettings
+            - lakeformation:PutDataLakeSettings
+            - lakeformation:GetEffectivePermissionsForPath
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - lakeformation:GetDataAccess
+            - lakeformation:GetTableObjects
+            - lakeformation:GetWorkUnits
+            - lakeformation:StartQueryPlanning
+            - lakeformation:GetWorkUnitResults
+            - lakeformation:GetQueryState
+            - lakeformation:GetQueryStatistics
+            - lakeformation:StopQueryPlanning
+            - lakeformation:UpdateTableObjects
+            - lakeformation:DeleteTableObjects
+            Resource: '*'
 
   # Glue Database
   GlueDatabase:
@@ -858,6 +883,22 @@ Resources:
         Name: !Sub '${ProjectName}_taxi_database'
         Description: NYC taxi database for the project
         LocationUri: !Sub 's3://${RawDataBucket}/'
+
+  # Lake Formation Database Permissions
+  LakeFormationDatabasePermission:
+    Type: AWS::LakeFormation::Resource
+    Properties:
+      ResourceArn: !Sub 'arn:aws:glue:${AWS::Region}:${AWS::AccountId}:database/${ProjectName}_taxi_database'
+      RoleArn: !GetAtt GlueJobRole.Arn
+      UseServiceLinkedRole: false
+
+  # Lake Formation Data Location Permissions
+  LakeFormationDataLocationPermission:
+    Type: AWS::LakeFormation::Resource
+    Properties:
+      ResourceArn: !Sub 'arn:aws:s3:::${RawDataBucket}'
+      RoleArn: !GetAtt GlueJobRole.Arn
+      UseServiceLinkedRole: false
 
   # Create a Glue crawler
   GlueCrawler:

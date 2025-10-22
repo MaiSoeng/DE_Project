@@ -292,6 +292,10 @@ Resources:
             - logs:CreateLogStream
             - logs:PutLogEvents
             Resource: '*'
+          - Effect: Allow
+            Action:
+            - lakeformation:*
+            Resource: '*'
 
   # lambda function to automatically start zone crawler 
   ZoneCrawlerTriggerLambda:
