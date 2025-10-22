@@ -192,8 +192,13 @@ Resources:
             Resource: '*'
           - Effect: Allow
             Action:
-            - lambda:InvokeFunction
-            Resource: !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-*'
+            - lambda:*
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - codepipeline:PutJobSuccessResult
+            - codepipeline:PutJobFailureResult
+            Resource: '*'
 
   # IAM Role for CloudFormation
   CloudFormationRole:
