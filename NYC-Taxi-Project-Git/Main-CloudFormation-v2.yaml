@@ -886,7 +886,7 @@ Resources:
 
   # Lake Formation Database Permissions
   LakeFormationDatabasePermission:
-    Type: AWS::LakeFormation::Permissions
+    Type: AWS::LakeFormation::PrincipalPermissions
     Properties:
       Resource:
         DatabaseResource:
@@ -901,10 +901,10 @@ Resources:
 
   # Lake Formation Data Location Permissions
   LakeFormationDataLocationPermission:
-    Type: AWS::LakeFormation::Permissions
+    Type: AWS::LakeFormation::PrincipalPermissions
     Properties:
       Resource:
-        DataLocationResource:
+        DataLocation:
           CatalogId: !Ref AWS::AccountId
           ResourceArn: !Sub 'arn:aws:s3:::${RawDataBucket}'
       Principal:
