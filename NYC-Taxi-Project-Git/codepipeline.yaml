@@ -124,6 +124,13 @@ Resources:
             Action:
             - sns:Publish
             Resource: !GetAtt PipelineNotification.TopicArn
+          - Effect: Allow
+            Action:
+            - lambda:InvokeFunction
+            - lambda:ListFunctions
+            - lambda:InvokeAsync
+            Resource:
+            - !Sub 'arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${ProjectName}-${DeployEnvironment}-postdeploy'
 
       - PolicyName: VPCAccess
         PolicyDocument:
