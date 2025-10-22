@@ -1067,7 +1067,7 @@ Resources:
             - s3:ListBucket
             Resource:
             - !GetAtt GlueBucket.Arn
-            - !Sub '${GlueBucket}/*'
+            - !Sub 'arn:aws:s3:::${GlueBucket}/*'
 
   # Lambda function to start the crawler automatically
   CrawlerLambdaFunction:
