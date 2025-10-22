@@ -883,8 +883,36 @@ Resources:
         Name: !Sub '${ProjectName}_taxi_database'
         Description: NYC taxi database for the project
         LocationUri: !Sub 's3://${RawDataBucket}/'
-        Parameters:
-          lakeformation: 'false'
+
+  # Lake Formation Database Permissions
+  LakeFormationDatabasePermission:
+    Type: AWS::LakeFormation::Permissions
+    Properties:
+      Resource:
+        DatabaseResource:
+          CatalogId: !Ref AWS::AccountId
+          Name: !Ref GlueDatabase
+      Principal:
+        DataLakePrincipalIdentifier: !GetAtt GlueJobRole.Arn
+      Permissions:
+      - ALL
+      PermissionsWithGrantOption:
+      - ALL
+
+  # Lake Formation Data Location Permissions
+  LakeFormationDataLocationPermission:
+    Type: AWS::LakeFormation::Permissions
+    Properties:
+      Resource:
+        DataLocationResource:
+          CatalogId: !Ref AWS::AccountId
+          ResourceArn: !Sub 'arn:aws:s3:::${RawDataBucket}'
+      Principal:
+        DataLakePrincipalIdentifier: !GetAtt GlueJobRole.Arn
+      Permissions:
+      - DATA_LOCATION_ACCESS
+      PermissionsWithGrantOption:
+      - DATA_LOCATION_ACCESS
 
   # Create a Glue crawler
   GlueCrawler:
