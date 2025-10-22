@@ -1422,7 +1422,7 @@ Resources:
             - s3:GetBucketVersioning
             Resource:
             - !Sub 'arn:aws:s3:::${ProjectName}-*'
-            - !Ref GlueBucket
+            - !Sub 'arn:aws:s3:::${GlueBucket}'
 
           # RDS
           - Effect: Allow
