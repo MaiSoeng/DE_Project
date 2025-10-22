@@ -899,7 +899,7 @@ Resources:
       PermissionsWithGrantOption:
       - ALL
 
-  # Lake Formation Data Location Permissions
+  # Lake Formation Data Location Permissions  
   LakeFormationDataLocationPermission:
     Type: AWS::LakeFormation::Permissions
     Properties:
