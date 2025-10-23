@@ -44,12 +44,6 @@ Parameters:
     MinLength: 8
     MaxLength: 41
 
-  EnableKinesisStreaming:
-    Type: String
-    Default: 'false'
-    AllowedValues: [ 'true', 'false' ]
-    Description: Optionally enable Kinesis Streaming for real-time data ingestion
-
 Resources:
   # Create an S3 bucket for raw NYC Taxi data
   RawDataBucket:
@@ -1184,7 +1178,7 @@ Resources:
     Properties:
       Name: !Sub '${ProjectName}-scheduled-crawler'
       Description: Run the crawler on a specific schedule
-      ScheduleExpression: 'cron(0 2 * * ? *)' # crawl the data at 2am UTC
+      ScheduleExpression: 'cron(0 10 1 * ? *)' # crawl the data on the 1st of each month at 10am UTC
       State: ENABLED
       Targets:
       - Arn: !GetAtt CrawlerLambdaFunction.Arn
@@ -1452,19 +1446,6 @@ Resources:
       ToPort: 3306
       SourceSecurityGroupId: !Ref QuickSightSecurityGroup
       Description: Allow QuickSight VPC Connection to access RDS
-
-  # Kinesis - Optional
-  KinesisStreaming:
-    Type: AWS::CloudFormation::Stack
-    Condition: EnableKinesis
-    Properties:
-      TemplateURL: !Sub 'https://${GlueBucket}.s3.amazonaws.com/templates/kinesis-stack.yaml'
-      Parameters:
-        ProjectName: !Ref ProjectName
-        RawDataBucket: !Ref RawDataBucket
-
-Conditions:
-  EnableKinesis: !Equals [ !Ref EnableKinesisStreaming, 'true' ]
 
 Outputs:
   RawDataBucket:
