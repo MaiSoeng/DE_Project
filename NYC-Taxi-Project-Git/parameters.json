@@ -6,8 +6,7 @@
     "SubnetAzs": "us-east-1a,us-east-1d",
     "DBName": "taxidata",
     "DBUsername": "usermi",
-    "DBPassword": "mi123456",
-    "EnableKinesisStreaming": "false"
+    "DBPassword": "mi123456"
   }
 }
 
