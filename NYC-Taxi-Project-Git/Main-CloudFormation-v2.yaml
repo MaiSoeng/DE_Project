@@ -204,7 +204,7 @@ Resources:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.glue'
       VpcEndpointType: Interface
-      PrivateDnsEnabled: false
+      PrivateDnsEnabled: true
       SubnetIds: !Ref SubnetIds
       SecurityGroupIds: [ !Ref VPCEndpointSG ]
       Tags:
@@ -219,7 +219,7 @@ Resources:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.logs'
       VpcEndpointType: Interface
-      PrivateDnsEnabled: false
+      PrivateDnsEnabled: true
       SubnetIds: !Ref SubnetIds
       SecurityGroupIds: [ !Ref VPCEndpointSG ]
       Tags:
@@ -264,7 +264,7 @@ Resources:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.secretsmanager'
       VpcEndpointType: Interface
-      PrivateDnsEnabled: false
+      PrivateDnsEnabled: true
       SubnetIds: !Ref SubnetIds
       SecurityGroupIds: [ !Ref VPCEndpointSG ]
       Tags:
@@ -279,7 +279,7 @@ Resources:
       VpcId: !Ref VpcId
       ServiceName: !Sub 'com.amazonaws.${AWS::Region}.monitoring'
       VpcEndpointType: Interface
-      PrivateDnsEnabled: false
+      PrivateDnsEnabled: true
       SubnetIds: !Ref SubnetIds
       SecurityGroupIds: [ !Ref VPCEndpointSG ]
       Tags:
